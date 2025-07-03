@@ -7,11 +7,11 @@ yeah but give credit also the status thingy only works if youre on lanyard serve
 so if you wanna use it this an example
 
 ```js
-http://thebreadapi/v0/user/userid=958708562035638362
+https://thebreadapi.vercel.app/v0/user/userid=958708562035638362
 ```
 or for the guilds the bot is in (no guilds idk why i even included that)
 ```js
-http://localhost:3000/v0/bot/guilds
+https://thebreadapi.vercel.app/v0/bot/guilds
 ```
 i added way more stuff but im to lazy to put an example so you will have to look on api endpoints
 ## hosting in local
