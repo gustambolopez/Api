@@ -20,6 +20,7 @@ git clone https://github.com/gustambolopez/Api.git
 ```
 then
 ```bash
+npm install
 node serverjs
 ```
 The bread api should be listening in port 3000
