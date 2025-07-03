@@ -13,6 +13,7 @@ or for the guilds the bot is in (no guilds idk why i even included that)
 ```js
 http://localhost:3000/v0/bot/guilds
 ```
+i added way more stuff but im to lazy to put an example so you will have to look on api endpoints
 ## hosting in local
 use 
 ```bash
@@ -26,3 +27,20 @@ node serverjs
 The bread api should be listening in port 3000
 ## Credits
 - [s16dih](https://github.com/gustambolopez)
+## API endpoints
+This api endpoints are available:
+/v0/user/userid=:userId
+/v0/bot/guilds
+/v0/guilds/:guildId
+/v0/channels/:channelId
+/v0/channels/:channelId/messages
+/v0/channels/:channelId/messages/:messageId
+/v0/guilds/:guildId/members/:userId
+/v0/guilds/:guildId/members
+/v0/guilds/:guildId/roles
+/v0/guilds/:guildId/emojis
+/v0/applications/:applicationId/commands
+/v0/applications/:applicationId/guilds/:guildId/commands
+
+## why not?
+why dont you make your own api like lanyard? i can but i would need all the users to join the server for it to work 

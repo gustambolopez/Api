@@ -1,72 +1,56 @@
 // the shitty discord api cuz why not (not rlly an api)
 
 const express = require('express');
-require('dotenv').config();
+require('dotenv').config(); 
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-app.use(express.json());
-
 // not really an api lol
-const DISCORD_BOT_TOKEN = process.env.DISCORD_TOKEN;
-const DISCORD_API_BASE_URL = 'https://discord.com/api/v10';
-const LANYARD_API_BASE_URL = 'https://api.lanyard.rest/v1/users/';
+const DISCORD_TOKEN = process.env.DISCORD_TOKEN;
+const DISCORD_API = 'https://discord.com/api/v10';
+const LANYARD_API = 'https://api.lanyard.rest/v1/users/';
 
-if (!DISCORD_BOT_TOKEN) {
+if (!DISCORD_TOKEN) {
     console.error('missing bot token lil bro');
     process.exit(1);
 }
 
-/**
- * @param {string} endpoint - API endpoint
- * @returns {Promise<Object>} - Parsed JSON
- */
-async function fetchFromDiscord(endpoint) {
-    try {
-        const response = await fetch(`${DISCORD_API_BASE_URL}${endpoint}`, {
-            headers: {
-                'Authorization': `Bot ${DISCORD_BOT_TOKEN}`,
-                'Content-Type': 'application/json',
-            },
-        });
+app.use(express.json());
 
-        if (!response.ok) {
-            const errorText = await response.text();
-            throw new Error(`Discord API Error ${response.status}: ${errorText}`);
-        }
 
-        return await response.json();
-    } catch (err) {
-        console.error(`Error fetching from Discord API (${endpoint}):`, err.message);
-        throw err;
+const fetchFromDiscord = async (endpoint) => {
+    const res = await fetch(`${DISCORD_API}${endpoint}`, {
+        headers: {
+            Authorization: `Bot ${DISCORD_TOKEN}`,
+            'Content-Type': 'application/json',
+        },
+    });
+
+    if (!res.ok) {
+        const err = await res.text();
+        throw new Error(err || 'api error');
     }
-}
 
-/**
- * @route GET /v0/user/userid=:userId
- * @desc userdata 
- */
+    return res.json();
+};
+
 app.get('/v0/user/userid=:userId', async (req, res) => {
     const { userId } = req.params;
 
     try {
         const userData = await fetchFromDiscord(`/users/${userId}`);
+        let lanyard = null;
 
-        let lanyardData = null;
         try {
-            const response = await fetch(`${LANYARD_API_BASE_URL}${userId}`);
-            if (response.ok) {
-                const json = await response.json();
-                if (json.success) {
-                    lanyardData = json.data;
-                }
-            }
-        } catch (err) {
-            console.warn(`Lanyard fetch failed for ${userId}:`, err.message);
-        }
+            const r = await fetch(`${LANYARD_API}${userId}`);
+            const j = await r.json();
+            lanyard = j?.data || null;
+        } catch (_) {
 
-        const userProfile = {
+        }
+ 
+        res.json({
             userId: userData.id,
             username: userData.username,
             discriminator: userData.discriminator,
@@ -82,39 +66,144 @@ app.get('/v0/user/userid=:userId', async (req, res) => {
             avatarDecorationData: userData.avatar_decoration_data || null,
             system: userData.system || null,
             bot: userData.bot || null,
-            // lanyard stuff
-            badges: lanyardData?.badges || null,
-            premiumSince: lanyardData?.premium_since || null,
-            mfaEnabled: lanyardData?.mfa_enabled || null,
-            clan: lanyardData?.clan || null,
-            lanyard: lanyardData || null,
+            // lanyard stuff and pay to have more lanyard stuff
+            badges: lanyard?.badges || null,
+            premiumSince: lanyard?.premium_since || null,
+            mfaEnabled: lanyard?.mfa_enabled || null,
+            clan: lanyard?.clan || null,
+            lanyard: lanyard || null, 
             accurate: true,
-        };
-
-        res.json(userProfile);
-    } catch (err) {
-        console.error('Error getting user data:', err.message);
-        res.status(500).json({ error: 'Failed to retrieve user information (lmao, i need to fix ts).' });
+            status: lanyard?.discord_status || 'unknown',
+            activities: lanyard?.activities || [],
+        });
+    } catch (e) {
+        res.status(500).json({ error: 'Could not get user', details: e.message });
     }
 });
 
-/**
- * @route GET /v0/bot/guilds
- * @desc gets the guilds where the bot is 
- */
-app.get('/v0/bot/guilds', async (req, res) => {
+// the bot guilds
+app.get('/v0/bot/guilds', async (_, res) => {
     try {
-        const guilds = await fetchFromDiscord('/users/@me/guilds');
-        res.json(guilds);
-    } catch (err) {
-        console.error('Error fetching guilds:', err.message);
-        res.status(500).json({ error: 'Failed to retrieve bot guilds (lmao).' });
+        const data = await fetchFromDiscord('/users/@me/guilds');
+        res.json(data);
+    } catch (e) {
+        res.status(500).json({ error: 'Could not get guilds', details: e.message });
     }
 });
 
-// starts the server
+// specific details of a guild 
+app.get('/v0/guilds/:guildId', async (req, res) => {
+    try {
+        const data = await fetchFromDiscord(`/guilds/${req.params.guildId}`);
+        res.json(data);
+    } catch (e) {
+        res.status(500).json({ error: 'failed to fetch the guild', details: e.message });
+    }
+});
+
+// channel info
+app.get('/v0/channels/:channelId', async (req, res) => {
+    try {
+        const data = await fetchFromDiscord(`/channels/${req.params.channelId}`);
+        res.json(data);
+    } catch (e) {
+        res.status(500).json({ error: 'failed to get the channel', details: e.message });
+    }
+});
+
+// info of a channel messages
+app.get('/v0/channels/:channelId/messages', async (req, res) => {
+    const { channelId } = req.params;
+    const qs = new URLSearchParams(req.query).toString();
+
+    try {
+        const data = await fetchFromDiscord(`/channels/${channelId}/messages${qs ? '?' + qs : ''}`);
+        res.json(data);
+    } catch (e) {
+        res.status(500).json({ error: 'get messages failed', details: e.message });
+    }
+});
+
+// info of a single messgae
+app.get('/v0/channels/:channelId/messages/:messageId', async (req, res) => {
+    const { channelId, messageId } = req.params;
+
+    try {
+        const data = await fetchFromDiscord(`/channels/${channelId}/messages/${messageId}`);
+        res.json(data);
+    } catch (e) {
+        res.status(500).json({ error: 'message couldnt be found', details: e.message });
+    }
+});
+
+// specific guild member
+app.get('/v0/guilds/:guildId/members/:userId', async (req, res) => {
+    const { guildId, userId } = req.params;
+
+    try {
+        const data = await fetchFromDiscord(`/guilds/${guildId}/members/${userId}`);
+        res.json(data);
+    } catch (e) {
+        res.status(500).json({ error: 'member not found', details: e.message });
+    }
+});
+
+// member list of a guild plus limits
+app.get('/v0/guilds/:guildId/members', async (req, res) => {
+    const { guildId } = req.params;
+    const qs = new URLSearchParams(req.query).toString();
+
+    try {
+        const data = await fetchFromDiscord(`/guilds/${guildId}/members${qs ? '?' + qs : ''}`);
+        res.json(data);
+    } catch (e) {
+        res.status(500).json({ error: 'Member list fetch failed', details: e.message });
+    }
+});
+
+// specific roles
+app.get('/v0/guilds/:guildId/roles', async (req, res) => {
+    try {
+        const data = await fetchFromDiscord(`/guilds/${req.params.guildId}/roles`);
+        res.json(data);
+    } catch (e) {
+        res.status(500).json({ error: 'cannot get role', details: e.message });
+    }
+});
+
+// List emojis in a guild
+app.get('/v0/guilds/:guildId/emojis', async (req, res) => {
+    try {
+        const data = await fetchFromDiscord(`/guilds/${req.params.guildId}/emojis`);
+        res.json(data);
+    } catch (e) {
+        res.status(500).json({ error: 'cannot get emojis', details: e.message });
+    }
+});
+
+// command list for a bot
+app.get('/v0/applications/:applicationId/commands', async (req, res) => {
+    try {
+        const data = await fetchFromDiscord(`/applications/${req.params.applicationId}/commands`);
+        res.json(data);
+    } catch (e) {
+        res.status(500).json({ error: 'cannot get bot commands', details: e.message });
+    }
+});
+
+// guild specific commands
+app.get('/v0/applications/:applicationId/guilds/:guildId/commands', async (req, res) => {
+    const { applicationId, guildId } = req.params;
+
+    try {
+        const data = await fetchFromDiscord(`/applications/${applicationId}/guilds/${guildId}/commands`);
+        res.json(data);
+    } catch (e) {
+        res.status(500).json({ error: 'cannot get guild commands ', details: e.message });
+    }
+});
+
+// start the server
 app.listen(PORT, () => {
-    console.log(`Server running at http://localhost:${PORT}`);
-    console.log(`Try: GET /v0/user/userid=<user_id>`);
-    console.log(`     GET /v0/bot/guilds`);
+    console.log(`Server listening on http://localhost:${PORT}`);
 });
